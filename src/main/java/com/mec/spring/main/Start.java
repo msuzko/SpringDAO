@@ -6,21 +6,18 @@ import com.mec.spring.dao.objects.MP3;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class Start {
 
     public static void main(String[] args) {
         Author author = new Author();
-        author.setName("Singer #5");
+        author.setName("Singer #9");
 
-        MP3 mp3 = new MP3("Song #5",author);
+        MP3 mp3 = new MP3("Song #9", author);
 
         ApplicationContext context = new ClassPathXmlApplicationContext("context.xml");
-        SQLiteDAO sqLiteDAO = context.getBean("sqliteDAO",SQLiteDAO.class);
+        SQLiteDAO sqLiteDAO = context.getBean("sqliteDAO", SQLiteDAO.class);
 
-       // sqLiteDAO.insert(mp3);
+        // sqLiteDAO.insert(mp3);
 //        MP3 mp32 = sqLiteDAO.getMP3ByID(2000);
 
         System.out.println(sqLiteDAO.insert(mp3));
