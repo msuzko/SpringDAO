@@ -4,12 +4,14 @@ package com.mec.spring.dao.interfaces.impls;
 import com.mec.spring.dao.interfaces.MP3Dao;
 import com.mec.spring.dao.objects.MP3;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
+import org.springframework.jdbc.core.namedparam.SqlParameterSourceUtils;
+import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
@@ -23,32 +25,42 @@ import java.util.TreeMap;
 public class SQLiteDAO implements MP3Dao {
 
     private NamedParameterJdbcTemplate jdbcTemplate;
+    private SimpleJdbcInsert insertMP3;
 
     @Autowired
     public void setDataSource(DataSource dataSource) {
         this.jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
+        this.insertMP3 = new SimpleJdbcInsert(dataSource).withTableName("mp3").usingColumns("name", "author");
     }
 
     @Override
     public int insert(MP3 mp3) {
-        String sql = "insert into mp3 (name, author) VALUES (:name, :author)";
-
-        KeyHolder keyHolder = new GeneratedKeyHolder();
+//        String sql = "insert into mp3 (name, author) VALUES (:name, :author)";
+//
+//        KeyHolder keyHolder = new GeneratedKeyHolder();
 
         MapSqlParameterSource params = new MapSqlParameterSource();
         params.addValue("name", mp3.getName());
         params.addValue("author", mp3.getAuthor());
 
-        jdbcTemplate.update(sql, params, keyHolder);
-
-        return keyHolder.getKey().intValue();
+        return insertMP3.execute(params);
+//        jdbcTemplate.update(sql, params, keyHolder);
+//
+//        return keyHolder.getKey().intValue();
     }
 
+//    public void insert(List<MP3> mp3List) {
+//        for (MP3 mp3 : mp3List) {
+//            insert(mp3);
+//        }
+//    }
+
     @Override
-    public void insert(List<MP3> mp3List) {
-        for (MP3 mp3 : mp3List) {
-            insert(mp3);
-        }
+    public int insert(List<MP3> list) {
+        String sql = "insert into mp3 (name, author) VALUES (:name, :author)";
+        SqlParameterSource[] batch = SqlParameterSourceUtils.createBatch(list.toArray());
+        int[] updateCounts = jdbcTemplate.batchUpdate(sql, batch);
+        return updateCounts.length;
     }
 
     @Override
@@ -80,8 +92,7 @@ public class SQLiteDAO implements MP3Dao {
                     map.put(author, count);
                 }
                 return map;
-            };
-
+            }
         });
 
     }
@@ -93,7 +104,12 @@ public class SQLiteDAO implements MP3Dao {
         MapSqlParameterSource params = new MapSqlParameterSource();
         params.addValue("id", id);
 
-        return jdbcTemplate.queryForObject(sql, params, new MP3RowMapper());
+        try {
+            return jdbcTemplate.queryForObject(sql, params, new MP3RowMapper());
+        } catch (DataAccessException e) {
+            System.out.println("Элемент не найден");
+            return null;
+        }
     }
 
     @Override
@@ -119,7 +135,10 @@ public class SQLiteDAO implements MP3Dao {
     @Override
     public int getMP3Count() {
         String sql = "select count(*) from mp3";
-        return jdbcTemplate.getJdbcOperations().queryForObject(sql, Integer.class);
+        Integer result = jdbcTemplate.getJdbcOperations().queryForObject(sql, Integer.class);
+        if (result != null)
+            return result;
+        return 0;
     }
 
     private static final class MP3RowMapper implements RowMapper<MP3> {

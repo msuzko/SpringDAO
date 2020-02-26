@@ -6,6 +6,15 @@ public class MP3 {
     private String author;
     private int id;
 
+
+    public MP3() {
+    }
+
+    public MP3(String name, String author) {
+        this.name = name;
+        this.author = author;
+    }
+
     public int getId() {
         return id;
     }
