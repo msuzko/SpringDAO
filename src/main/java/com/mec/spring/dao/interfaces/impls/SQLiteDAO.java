@@ -2,6 +2,7 @@ package com.mec.spring.dao.interfaces.impls;
 
 
 import com.mec.spring.dao.interfaces.MP3Dao;
+import com.mec.spring.dao.objects.Author;
 import com.mec.spring.dao.objects.MP3;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
@@ -12,7 +13,10 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.jdbc.core.namedparam.SqlParameterSourceUtils;
 import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
 import java.sql.ResultSet;
@@ -34,33 +38,45 @@ public class SQLiteDAO implements MP3Dao {
     }
 
     @Override
+    @Transactional
     public int insert(MP3 mp3) {
-//        String sql = "insert into mp3 (name, author) VALUES (:name, :author)";
-//
-//        KeyHolder keyHolder = new GeneratedKeyHolder();
+        String sqlAuthor = "insert into author (name) VALUES (:authorName)";
 
+        Author author = mp3.getAuthor();
         MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("name", mp3.getName());
-        params.addValue("author", mp3.getAuthor());
+        params.addValue("authorName", author.getName());
+        KeyHolder keyHolder = new GeneratedKeyHolder();
 
-        return insertMP3.execute(params);
-//        jdbcTemplate.update(sql, params, keyHolder);
+        jdbcTemplate.update(sqlAuthor, params, keyHolder);
+        int authorId = keyHolder.getKey().intValue();
+
+        String sqlMp3 = "insert into mp3 (name, author_id) values (:mp3Name, :authorId)";
+        params = new MapSqlParameterSource();
+        params.addValue("mp3Name", mp3.getName());
+        params.addValue("authorId", authorId);
+
+        return jdbcTemplate.update(sqlMp3, params);
+
+//        MapSqlParameterSource params = new MapSqlParameterSource();
+//        params.addValue("name", mp3.getName());
+//        params.addValue("author", mp3.getAuthor());
 //
-//        return keyHolder.getKey().intValue();
+//        return insertMP3.execute(params);
     }
 
-//    public void insert(List<MP3> mp3List) {
-//        for (MP3 mp3 : mp3List) {
-//            insert(mp3);
-//        }
-//    }
-
-    @Override
-    public int insert(List<MP3> list) {
+    public int insertBatch(List<MP3> list) {
         String sql = "insert into mp3 (name, author) VALUES (:name, :author)";
         SqlParameterSource[] batch = SqlParameterSourceUtils.createBatch(list.toArray());
         int[] updateCounts = jdbcTemplate.batchUpdate(sql, batch);
         return updateCounts.length;
+    }
+
+    @Override
+    public int insert(List<MP3> list) {
+        for (MP3 mp3 : list) {
+            insert(mp3);
+        }
+        return list.size();
     }
 
     @Override
@@ -80,14 +96,14 @@ public class SQLiteDAO implements MP3Dao {
 
     @Override
     public Map<String, Integer> getStat() {
-        String sql = "select author, count(*) as count from mp3 group by author";
+        String sql = "select author_name, count(*) as count from mp3_view group by author_name";
 
         return jdbcTemplate.query(sql, new ResultSetExtractor<Map<String, Integer>>() {
 
             public Map<String, Integer> extractData(ResultSet rs) throws SQLException {
                 Map<String, Integer> map = new TreeMap<>();
                 while (rs.next()) {
-                    String author = rs.getString("author");
+                    String author = rs.getString("author_name");
                     int count = rs.getInt("count");
                     map.put(author, count);
                 }
@@ -99,10 +115,10 @@ public class SQLiteDAO implements MP3Dao {
 
     @Override
     public MP3 getMP3ByID(int id) {
-        String sql = "select * from mp3 where id=:id";
+        String sql = "select * from mp3_view where mp3_id=:mp3_id";
 
         MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("id", id);
+        params.addValue("mp3_id", id);
 
         try {
             return jdbcTemplate.queryForObject(sql, params, new MP3RowMapper());
@@ -114,20 +130,20 @@ public class SQLiteDAO implements MP3Dao {
 
     @Override
     public List<MP3> getMP3ListByName(String name) {
-        String sql = "select * from mp3 where upper(name) like :name";
+        String sql = "select * from mp3_view where upper(mp3_name) like :mp3_name";
 
         MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("name", "%" + name.toUpperCase() + "%");
+        params.addValue("mp3_name", "%" + name.toUpperCase() + "%");
 
         return jdbcTemplate.query(sql, params, new MP3RowMapper());
     }
 
     @Override
     public List<MP3> getMP3ListByAuthor(String author) {
-        String sql = "select * from mp3 where upper(author) like :author";
+        String sql = "select * from mp3_view where upper(author_name) like :author_name";
 
         MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("author", "%" + author.toUpperCase() + "%");
+        params.addValue("author_name", "%" + author.toUpperCase() + "%");
 
         return jdbcTemplate.query(sql, params, new MP3RowMapper());
     }
@@ -145,12 +161,18 @@ public class SQLiteDAO implements MP3Dao {
 
         @Override
         public MP3 mapRow(ResultSet rs, int rowNum) throws SQLException {
+
+            Author author = new Author();
+            author.setId(rs.getInt("author_id"));
+            author.setName(rs.getString("author_name"));
+
             MP3 mp3 = new MP3();
-            mp3.setId(rs.getInt("id"));
-            mp3.setName(rs.getString("name"));
-            mp3.setAuthor(rs.getString("author"));
+            mp3.setId(rs.getInt("mp3_id"));
+            mp3.setName(rs.getString("mp3_name"));
+            mp3.setAuthor(author);
             return mp3;
         }
 
     }
 }
+
