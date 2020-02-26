@@ -10,9 +10,8 @@ public class Start {
 
     public static void main(String[] args) {
         Author author = new Author();
-        author.setName("Singer #9");
-
-        MP3 mp3 = new MP3("Song #9", author);
+        author.setName("Singer #10");
+        MP3 mp3 = new MP3("Song #10", author);
 
         ApplicationContext context = new ClassPathXmlApplicationContext("context.xml");
         SQLiteDAO sqLiteDAO = context.getBean("sqliteDAO", SQLiteDAO.class);
